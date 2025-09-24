@@ -7,8 +7,27 @@ import random
 import datetime
 from .models import *
 
-def load_block_trials():
+
+def load_block_trials(ps: float, human_sensitivity: float, system_sensitivity: float) -> dict:
     event_data = pd.read_csv("data/stimulus/events.csv")
+    event_data_2 = pd.read_csv("data/stimulus/events_2.csv")
+    generated_data = event_data_2[(event_data_2['ps'] == ps) &
+                                  (event_data_2['dprime_h'] == human_sensitivity) &
+                                  (event_data_2['dprime_s'] == system_sensitivity)].copy()
+    a = {1: {}, 2: {}, 3: {}}
+    a[1][1] = {'event': 'noise', 'stimuli': 7.043675233241219, 'ds_stimuli': 0.6470356136858931, 'ds_judgment': 1}
+    a[2][1] = {'event': 'noise', 'stimuli': 7.043675233241219, 'ds_stimuli': 0.6470356136858931, 'ds_judgment': 1}
+
+    for index, row in generated_data.iterrows():
+         for event_number in range(1, 101):
+             if event_number < 10:
+                 event_number = f'0{event_number}'
+             event_type = row[f'event_t{event_number}']
+             human_stimulus = row[f'h_t{event_number}']
+             system_stimulus = row[f's_t{event_number}']
+             system_judgment = row[f'ds_dec_t{event_number}']
+             a[3][int(event_number)] = {'event': event_type, 'stimuli': human_stimulus, 'ds_stimuli': system_stimulus,
+                                        'ds_judgment': system_judgment}
     nested_dict = (
         event_data
         .groupby(['block', 'trial'])
@@ -17,14 +36,18 @@ def load_block_trials():
         .T
         .to_dict()
     )
-    return nested_dict
+    print(a[1][1])
+    return a
 
 
 def landing_page(request):
-    request.session["ds_sensitivity"] = random.choice(['low', 'high'])
-    request.session["ds_cost"] = random.choice(['5', '14'])
+    request.session["ps"] = random.choice([0.2, 0.35, 0.5])
+    request.session["human_sensitivity"] = random.choice([0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9, 2.1, 2.3, 2.5])
+    request.session["ds_sensitivity"] = random.choice([0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9, 2.1, 2.3, 2.5])
     request.session["block_scores"] = {}
-    request.session["events_data"] = load_block_trials()
+    request.session["events_data"] = load_block_trials(request.session["ps"],
+                                                       request.session["human_sensitivity"],
+                                                       request.session["ds_sensitivity"])
     request.session["aid"] = request.GET.get("aid", "test")
     request.session["experiment_start_time"] = datetime.datetime.now().isoformat()
 
@@ -33,10 +56,9 @@ def landing_page(request):
         experiment_data = ExperimentData.objects.create(
             aid=request.session["aid"],
             ds_sensitivity=request.session["ds_sensitivity"],
-            ds_cost=request.session["ds_cost"]
+            ds_cost=request.session["ps"]
         )
         request.session["user_id"] = experiment_data.user_id
-    print(request.session["user_id"])
     if request.method == "POST":
         if request.POST['Continue'] == 'continue':
             return redirect('/consent_form/')
@@ -77,14 +99,14 @@ def recaptcha(request):
             return redirect('/instructions/')
         else:
             return render(request, 'recaptcha.html', {'error': 'Invalid reCAPTCHA. Try again.'})
-
+    return redirect('/instructions/')
     return render(request, 'recaptcha.html')
 
 
 def instructions(request):
     current_screen = request.session.get("current_screen", "1")
     context = {
-        "screen": current_screen, 'ds_cost': request.session["ds_cost"],
+        "screen": current_screen, 'ds_cost': request.session["ds_sensitivity"],
         "v_tp": 3, "v_fp": 3, "v_tn": 3, "v_fn": 6,
     }
     if request.method == "POST":
@@ -102,17 +124,17 @@ def instructions(request):
         elif request.POST['Continue'] == 'start_block_2':
             request.session["current_screen"] += 1
             request.session["pd"] = True
-            request.session["score"] = 30 - int(request.session["ds_cost"])
+            request.session["score"] = 30
             request.session["block"] = 2
             request.session["trial"] = 1
             return redirect('/game/')
         elif request.POST['Continue'] == 'pd_screen':
             request.session["pd"] = True
             request.session["score"] = 30
-            request.session["block"] = 2
+            request.session["block"] = 3
             request.session["trial"] = 1
             request.session["default"] = False
-            return redirect('/performance_summary/')
+            return redirect('/game/')
         return redirect('/instructions/')
 
     return render(request, "instructions.html", context)
@@ -196,24 +218,26 @@ def game(request):
     if request.method == "GET":
         request.session['screen_entry_time'] = datetime.datetime.now().isoformat()
 
-    if request.session["block"] <= 2 and request.session["trial"] > 20:
+    if request.session["block"] <= 2 and request.session["trial"] > 1:
         if request.session["block"] == 1:
             request.session["block_scores"][1] = [request.session["score"], False]
         if request.session["block"] == 2:
             request.session["block_scores"][2] = [request.session["score"], True]
+        else:
+            request.session["block_scores"][2] = [request.session["score"], True]
         return redirect('/instructions/')
-    elif request.session["block"] == 3 and request.session["trial"] > 40:
+    elif request.session["block"] == 3 and request.session["trial"] > 80:
         request.session["block_scores"][3] = [request.session["score"], request.session["pd"]]
         request.session["pd"] = True
         request.session["score"] = 30
         request.session["trial"] = 1
         request.session["default"] = False
-        return redirect('/performance_summary/')
-    elif request.session["block"] == 4 and request.session["trial"] > 40:
         return redirect('/toast_1/')
-
+    elif request.session["block"] == 4 and request.session["trial"] > 0:
+        return redirect('/toast_1/')
+    print(request.session["events_data"][str(request.session["block"])])
     event_type = request.session["events_data"][str(request.session["block"])][str(request.session["trial"])]['event']
-    ds_judgment = request.session["events_data"][str(request.session["block"])][str(request.session["trial"])][f'ds_judgment_{request.session["ds_sensitivity"]}']
+    ds_judgment = request.session["events_data"][str(request.session["block"])][str(request.session["trial"])][f'ds_judgment']
     stimuli = round(request.session["events_data"][str(request.session["block"])][str(request.session["trial"])]['stimuli'], 2)
 
     context = {'pd': request.session["pd"],
@@ -241,7 +265,7 @@ def game(request):
         if 'user_id' in request.session:
             # Get the ExperimentData instance using the user_id
             experiment_data = ExperimentData.objects.get(user_id=request.session["user_id"])
-
+            print(request.session["block"],request.session["trial"])
             # Create a new ExperimentAction object with the related ExperimentData instance
             ExperimentAction.objects.create(
                 user_id=experiment_data,  # Pass the ExperimentData instance, not just the user_id
@@ -270,8 +294,6 @@ def toast_1(request):
         request.session["q2"] = request.POST.get('reliability')
         request.session["q3"] = request.POST.get('trust')
         request.session["q4"] = request.POST.get('confidence')
-        for i in range(1,5):
-            print(request.session[f"q{i}"])
 
         return redirect('/toast_2/')
 
@@ -300,8 +322,6 @@ def toast_2(request):
             comfortable=request.session["q9"]
         )
 
-        for i in range(5,10):
-            print(request.session[f"q{i}"])
         return redirect('/end/')
 
     return render(request, 'toast_2.html')
