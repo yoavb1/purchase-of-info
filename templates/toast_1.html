@@ -82,28 +82,14 @@
     }
 
     @media only screen and (max-width: 768px) {
-      h1 {
-        font-size: 22px;
-      }
-
-      .question p {
-        font-size: 16px;
-      }
-
-      .button {
-        font-size: 16px;
-      }
+      h1 { font-size: 22px; }
+      .question p { font-size: 16px; }
+      .button { font-size: 16px; }
     }
 
     @media only screen and (max-width: 480px) {
-      .container {
-        margin: 20px;
-        padding: 15px;
-      }
-
-      .button {
-        padding: 12px;
-      }
+      .container { margin: 20px; padding: 15px; }
+      .button { padding: 12px; }
     }
   </style>
 </head>
@@ -121,40 +107,47 @@
         <!-- Q1 -->
         <div class="question">
           <p>I understand what the system should do.</p>
-          <input type="range" name="usefulness" min="0" max="7" value="0" id="usefulness" oninput="updateOutput('usefulness'); markTouched('usefulness')"/>
-          <output id="usefulness-output"><strong>0</strong></output>
+          <input type="range" name="usefulness" min="1" max="7" value="1" id="usefulness"
+                 oninput="updateOutput('usefulness'); markTouched('usefulness')"/>
+          <output id="usefulness-output"></output>
         </div>
+
         <!-- Q2 -->
         <div class="question">
           <p>I understand the limitations of the system.</p>
-          <input type="range" name="reliability" min="0" max="7" value="0" id="reliability" oninput="updateOutput('reliability'); markTouched('reliability')"/>
-          <output id="reliability-output"><strong>0</strong></output>
-            <div style="display: flex; justify-content: space-between; font-size: 14px;">
-                <span>1 (Strongly Disagree)</span>
-                <span>7 (Strongly Agree)</span>
-            </div>
+          <input type="range" name="reliability" min="1" max="7" value="1" id="reliability"
+                 oninput="updateOutput('reliability'); markTouched('reliability')"/>
+          <output id="reliability-output"></output>
+          <div style="display: flex; justify-content: space-between; font-size: 14px;">
+            <span>1 (Strongly Disagree)</span>
+            <span>7 (Strongly Agree)</span>
+          </div>
         </div>
+
         <!-- Q3 -->
         <div class="question">
           <p>I understand the capabilities of the system.</p>
-          <input type="range" name="trust" min="0" max="7" value="0" id="trust" oninput="updateOutput('trust'); markTouched('trust')"/>
-          <output id="trust-output"><strong>0</strong></output>
-            <div style="display: flex; justify-content: space-between; font-size: 14px;">
-                <span>1 (Strongly Disagree)</span>
-                <span>7 (Strongly Agree)</span>
-            </div>
+          <input type="range" name="trust" min="1" max="7" value="1" id="trust"
+                 oninput="updateOutput('trust'); markTouched('trust')"/>
+          <output id="trust-output"></output>
+          <div style="display: flex; justify-content: space-between; font-size: 14px;">
+            <span>1 (Strongly Disagree)</span>
+            <span>7 (Strongly Agree)</span>
+          </div>
         </div>
+
         <!-- Q4 -->
         <div class="question">
           <p>I understand how the system executes tasks.</p>
-          <input type="range" name="confidence" min="0" max="7" value="0" id="confidence" oninput="updateOutput('confidence'); markTouched('confidence')"/>
-          <output id="confidence-output"><strong>0</strong></output>
-            <div style="display: flex; justify-content: space-between; font-size: 14px;">
-                <span>1 (Strongly Disagree)</span>
-                <span>7 (Strongly Agree)</span>
-            </div>
+          <input type="range" name="confidence" min="1" max="7" value="1" id="confidence"
+                 oninput="updateOutput('confidence'); markTouched('confidence')"/>
+          <output id="confidence-output"></output>
+          <div style="display: flex; justify-content: space-between; font-size: 14px;">
+            <span>1 (Strongly Disagree)</span>
+            <span>7 (Strongly Agree)</span>
+          </div>
         </div>
-      </div>
+
         <div class="button-container">
           <button type="submit" class="button">Submit</button>
         </div>
@@ -162,46 +155,37 @@
     </form>
   </div>
 
-      <script>
-      const touched = new Set();
+<script>
+  const touched = new Set();
 
-      window.onload = () => {
-        document.querySelectorAll('input[type="range"]').forEach(slider => {
-          updateOutput(slider.id);
-          // Add event listener for marking as touched
-          slider.addEventListener('input', () => {
-            markTouched(slider.id);
-          });
-        });
-      };
+  // Initialize all sliders and outputs
+  window.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('input[type="range"]').forEach(slider => {
+      updateOutput(slider.id);
+      slider.addEventListener('input', () => markTouched(slider.id));
+    });
+  });
 
-      function updateOutput(id) {
-        var slider = document.getElementById(id);
-        var output = document.getElementById(id + '-output');
-        output.innerHTML = '<strong>' + slider.value + '</strong>';
+  function updateOutput(id) {
+    const slider = document.getElementById(id);
+    const output = document.getElementById(id + '-output');
+    output.innerHTML = '<strong>' + slider.value + '</strong>';
+  }
+
+  function markTouched(id) {
+    touched.add(id);
+  }
+
+  function validateForm() {
+    const sliders = document.querySelectorAll('input[type="range"]');
+    for (let slider of sliders) {
+      if (!touched.has(slider.id)) {
+        alert('Please interact with all sliders before submitting.');
+        return false;
       }
-
-      function markTouched(id) {
-        touched.add(id);
-      }
-
-      function goToStep(stepNumber) {
-        document.querySelectorAll('.step').forEach(step => step.classList.remove('active'));
-        document.getElementById('step' + stepNumber).classList.add('active');
-      }
-
-      function validateForm() {
-        const sliders = document.querySelectorAll('input[type="range"]');
-        for (let slider of sliders) {
-          if (!touched.has(slider.id)) {
-            alert('Please interact with all sliders before submitting.');
-            return false;
-          }
-        }
-        return true;
-      }
-    </script>
-
-
+    }
+    return true;
+  }
+</script>
 </body>
 </html>
