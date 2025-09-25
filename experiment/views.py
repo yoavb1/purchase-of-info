@@ -65,7 +65,6 @@ def consent_form(request):
     if request.method == "POST":
         if request.POST['Continue'] == 'begin_experiment':
             request.session["current_screen"] = 1
-            return redirect('/toast_1/')
             return redirect('/recaptcha/')
         elif request.POST['Continue'] == 'end_experiment':
             return redirect('/end/')  # Redirect to the instruction page (replace with actual URL name)
