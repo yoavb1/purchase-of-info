@@ -94,7 +94,7 @@ def recaptcha(request):
             return redirect('/instructions/')
         else:
             return render(request, 'recaptcha.html', {'error': 'Invalid reCAPTCHA. Try again.'})
-    return redirect('/instructions/') # delete in production
+    # return redirect('/instructions/') # delete in production
     return render(request, 'recaptcha.html')
 
 
