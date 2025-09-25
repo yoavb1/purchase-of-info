@@ -79,7 +79,8 @@ def recaptcha(request):
             return render(request, 'form.html', {'error': 'reCAPTCHA not completed.'})
 
         # Verify the token with Google
-        secret_key = '6Le9qzkrAAAAANuiJE_y7Y-QmEhlCs2KDk8XD7R7'
+        # 6LcGItUrAAAAAJTHmBumFjKykL8uJ8xWmdWPxdkM
+        secret_key = '6LcGItUrAAAAACUzthkRPFZK2y-AJfPvH7aDtSTy'
         verify_url = 'https://www.google.com/recaptcha/api/siteverify'
         payload = {
             'secret': secret_key,
