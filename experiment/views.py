@@ -7,16 +7,17 @@ import random
 import datetime
 from .models import *
 
+ADMIN_PASSWORD = '0571JyY!'
+
 
 def load_block_trials(ps: float, human_sensitivity: float, system_sensitivity: float) -> dict:
-    event_data = pd.read_csv("data/stimulus/events.csv")
-    event_data_2 = pd.read_csv("data/stimulus/events_2.csv")
-    generated_data = event_data_2[(event_data_2['ps'] == ps) &
-                                  (event_data_2['dprime_h'] == human_sensitivity) &
-                                  (event_data_2['dprime_s'] == system_sensitivity)].copy()
-    a = {1: {}, 2: {}, 3: {}}
-    a[1][1] = {'event': 'noise', 'stimuli': 7.043675233241219, 'ds_stimuli': 0.6470356136858931, 'ds_judgment': 1}
-    a[2][1] = {'event': 'noise', 'stimuli': 7.043675233241219, 'ds_stimuli': 0.6470356136858931, 'ds_judgment': 1}
+    event_data = pd.read_csv("data/stimulus/events_2.csv")
+    generated_data = event_data[(event_data['ps'] == ps) &
+                                (event_data['dprime_h'] == human_sensitivity) &
+                                (event_data['dprime_s'] == system_sensitivity)].copy()
+    data_dict = {1: {}, 2: {}, 3: {}}
+    data_dict[1][1] = {'event': 'noise', 'stimuli': 7.043675233241219, 'ds_stimuli': 0.6470356136858931, 'ds_judgment': 1}
+    data_dict[2][1] = {'event': 'noise', 'stimuli': 7.043675233241219, 'ds_stimuli': 0.6470356136858931, 'ds_judgment': 1}
 
     for index, row in generated_data.iterrows():
          for event_number in range(1, 101):
@@ -26,18 +27,11 @@ def load_block_trials(ps: float, human_sensitivity: float, system_sensitivity: f
              human_stimulus = row[f'h_t{event_number}']
              system_stimulus = row[f's_t{event_number}']
              system_judgment = row[f'ds_dec_t{event_number}']
-             a[3][int(event_number)] = {'event': event_type, 'stimuli': human_stimulus, 'ds_stimuli': system_stimulus,
-                                        'ds_judgment': system_judgment}
-    nested_dict = (
-        event_data
-        .groupby(['block', 'trial'])
-        .apply(lambda df: df.iloc[0].drop(['block', 'trial']).to_dict())
-        .unstack()
-        .T
-        .to_dict()
-    )
-    print(a[1][1])
-    return a
+             data_dict[3][int(event_number)] = {'event': event_type,
+                                                'stimuli': human_stimulus,
+                                                'ds_stimuli': system_stimulus,
+                                                'ds_judgment': system_judgment}
+    return data_dict
 
 
 def landing_page(request):
@@ -55,8 +49,9 @@ def landing_page(request):
     if 'user_id' not in request.session:  # Ensure we don't create a new entry every time
         experiment_data = ExperimentData.objects.create(
             aid=request.session["aid"],
-            ds_sensitivity=request.session["ds_sensitivity"],
-            ds_cost=request.session["ps"]
+            ps=request.session["ps"],
+            human_sensitivity=request.session["human_sensitivity"],
+            ds_sensitivity=request.session["ds_sensitivity"]
         )
         request.session["user_id"] = experiment_data.user_id
     if request.method == "POST":
@@ -99,14 +94,14 @@ def recaptcha(request):
             return redirect('/instructions/')
         else:
             return render(request, 'recaptcha.html', {'error': 'Invalid reCAPTCHA. Try again.'})
-    return redirect('/instructions/')
+    return redirect('/instructions/') # delete in production
     return render(request, 'recaptcha.html')
 
 
 def instructions(request):
     current_screen = request.session.get("current_screen", "1")
     context = {
-        "screen": current_screen, 'ds_cost': request.session["ds_sensitivity"],
+        "screen": current_screen, 'ds_sensitivity': request.session["ds_sensitivity"],
         "v_tp": 3, "v_fp": 3, "v_tn": 3, "v_fn": 6,
     }
     if request.method == "POST":
@@ -167,52 +162,6 @@ def end(request):
     return render(request, 'end.html', context)
 
 
-def performance_summary(request):
-    if request.method == "POST":
-        if request.POST['Continue'] == 'continue':
-            request.session["answer"] = False
-            return redirect('/pd_screen/')
-
-    blocks = [
-        {"number": block_num, "points": data[0], "used_dss": data[1]}
-        for block_num, data in sorted(request.session["block_scores"].items())
-    ]
-    return render(request, 'BlockSummary.html', {"blocks": blocks})
-
-
-def pd_screen(request):
-    if request.method == "POST":
-        if request.POST['Continue'] == 'Purchase':
-            request.session["pd"] = True
-            request.session["default"] = True
-            request.session["score"] = 30 - int(request.session["ds_cost"])
-            request.session["answer"] = True
-            return redirect('/pd_screen/')
-        elif request.POST['Continue'] == 'No Purchase':
-            request.session["default"] = True
-            request.session["pd"] = False
-            request.session["score"] = 30
-            request.session["answer"] = True
-            return redirect('/pd_screen/')
-        elif request.POST['Continue'] == 'submit':
-            if request.session["answer"]:
-                request.session["block"] += 1
-                request.session["trial"] = 1
-                return redirect('/game/')
-            else:
-                return redirect('/pd_screen/')
-
-    purchase_button_class = 'active' if request.session["pd"] and request.session["default"] else 'inactive'
-    no_purchase_button_class = 'active' if not request.session["pd"] and request.session["default"] else 'inactive'
-    context = {
-        'cost': request.session["ds_cost"],
-        'pd': False,
-        'score': request.session["score"],
-        'purchase_button_class': purchase_button_class,
-        'no_purchase_button_class': no_purchase_button_class
-    }
-    return render(request, 'PurchaseDecision.html', context)
-
 
 def game(request):
     if request.method == "GET":
@@ -226,7 +175,7 @@ def game(request):
         else:
             request.session["block_scores"][2] = [request.session["score"], True]
         return redirect('/instructions/')
-    elif request.session["block"] == 3 and request.session["trial"] > 80:
+    elif request.session["block"] == 3 and request.session["trial"] > 2:
         request.session["block_scores"][3] = [request.session["score"], request.session["pd"]]
         request.session["pd"] = True
         request.session["score"] = 30
@@ -235,7 +184,6 @@ def game(request):
         return redirect('/toast_1/')
     elif request.session["block"] == 4 and request.session["trial"] > 0:
         return redirect('/toast_1/')
-    print(request.session["events_data"][str(request.session["block"])])
     event_type = request.session["events_data"][str(request.session["block"])][str(request.session["trial"])]['event']
     ds_judgment = request.session["events_data"][str(request.session["block"])][str(request.session["trial"])][f'ds_judgment']
     stimuli = round(request.session["events_data"][str(request.session["block"])][str(request.session["trial"])]['stimuli'], 2)
@@ -271,7 +219,6 @@ def game(request):
                 user_id=experiment_data,  # Pass the ExperimentData instance, not just the user_id
                 block_number=request.session["block"],
                 trial_number=request.session["trial"],
-                purchase_decision=request.session["pd"],
                 classification_decision=request.session["classification"],
                 stimulus_seen=stimuli,
                 dss_judgment=ds_judgment,
@@ -331,11 +278,12 @@ def save_db(request):
     if request.session['authenticated']:
         users_dict = {}
         for idx, user in enumerate(ExperimentData.objects.all()):
-            users_dict[idx] = [user.user_id, user.aid, user.ds_sensitivity, user.ds_cost, user.start_time,
+            users_dict[idx] = [user.user_id, user.aid, user.ps, user.human_sensitivity, user.ds_sensitivity, user.start_time,
                                user.complete, user.end_time]
 
         users_df = pd.DataFrame.from_dict(users_dict, orient='index',
-                                          columns=['user_id', 'aid', 'ds_sensitivity', 'ds_cost', 'start_time', 'complete', 'end_time'])
+                                          columns=['user_id', 'aid', 'ps', 'human_sensitivity', 'ds_sensitivity',
+                                                   'start_time', 'complete', 'end_time'])
         users_df.to_csv('data/experiment_data.csv', index=False)
 
         # ---- ExperimentAction ----
@@ -345,7 +293,6 @@ def save_db(request):
                 action.user_id.user_id,
                 action.block_number,
                 action.trial_number,
-                action.purchase_decision,
                 action.classification_decision,
                 action.stimulus_seen,
                 action.dss_judgment,
@@ -355,7 +302,7 @@ def save_db(request):
 
         actions_df = pd.DataFrame.from_dict(actions_dict, orient='index',
                                             columns=['user_id', 'block_number', 'trial_number',
-                                                     'purchase_decision', 'classification_decision',
+                                                     'classification_decision',
                                                      'stimulus_seen', 'dss_judgment',
                                                      'decision_time', 'correct_classification'])
         actions_df.to_csv('data/experiment_actions.csv', index=False)
@@ -400,25 +347,16 @@ def progress(request):
 
         users_dict = {}
         for idx, user in enumerate(ExperimentData.objects.all()):
-            users_dict[idx] = [user.user_id, user.aid, user.ds_sensitivity, user.ds_cost, user.start_time,
+            users_dict[idx] = [user.user_id, user.aid, user.ps, user.human_sensitivity, user.ds_sensitivity, user.start_time,
                                user.complete, user.end_time]
 
         users_df = pd.DataFrame.from_dict(users_dict, orient='index',
-                                          columns=['user_id', 'aid', 'ds_sensitivity', 'ds_cost', 'start_time',
+                                          columns=['user_id', 'aid', 'ps', 'human_sensitivity', 'ds_sensitivity', 'start_time',
                                                    'complete', 'end_time'])
 
         users_df = users_df[users_df['complete'] == True]
 
-        low_low = users_df[(users_df['ds_sensitivity'] == 'low') & (users_df['ds_cost'] == '5')].shape[0]
-        low_high = users_df[(users_df['ds_sensitivity'] == 'low') & (users_df['ds_cost'] == '14')].shape[0]
-        high_low = users_df[(users_df['ds_sensitivity'] == 'high') & (users_df['ds_cost'] == '5')].shape[0]
-        high_high = users_df[(users_df['ds_sensitivity'] == 'high') & (users_df['ds_cost'] == '14')].shape[0]
-
         return render(request, 'user_progress.html', {
-            'low_low': low_low,
-            'low_high': low_high,
-            'high_low': high_low,
-            'high_high': high_high,
             'total': users_df.shape[0]
         })
     else:
