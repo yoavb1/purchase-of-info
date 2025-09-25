@@ -81,7 +81,12 @@
         <form method="POST">
             {% csrf_token %}
             <div class="recaptcha-container">
-                <div class="g-recaptcha" data-sitekey="6LcGItUrAAAAACUzthkRPFZK2y-AJfPvH7aDtSTy" data-callback="enableSubmit"></div>
+
+                <button class="g-recaptcha"
+                        data-sitekey="6LeNJdUrAAAAAFui3_x_jOguGyv_CQWbPJAvj2x5"
+                        data-callback='onSubmit'
+                        data-action='submit'>
+                    </button>
             </div>
             <button type="submit" class="button">Submit</button>
         </form>
