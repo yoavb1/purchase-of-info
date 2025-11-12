@@ -7,8 +7,6 @@ import random
 import datetime
 from .models import *
 
-ADMIN_PASSWORD = '0571JyY!'
-
 
 def load_block_trials(ps: float, human_sensitivity: float, system_sensitivity: float) -> dict:
     event_data = pd.read_csv("data/stimulus/events_2.csv")
